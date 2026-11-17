@@ -37,8 +37,7 @@ main{max-width:none;margin:0 auto;padding:16px;display:grid;grid-template-column
 .legend{font-size:12px;color:var(--mu);margin-top:10px}
 #rep{width:100%;border:0;background:transparent;display:block;min-height:500px}
 .msg{padding:50px 20px;text-align:center;color:var(--mu)}
-#syncb{border:1px solid var(--ln);background:var(--card);color:var(--tx);padding:9px 12px;border-radius:12px;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#syncb.ok{border-color:#2a8a4a}#syncb.err{border-color:#c0392b;color:#c0392b}#syncb.run{border-color:var(--blu);color:var(--blu)}
+#syncb{display:block;font-size:12px;font-weight:400;color:var(--mu);cursor:default;margin-top:1px}#syncb.ok{color:#2a8a4a}#syncb.err{color:#c0392b;cursor:pointer}#syncb.run{color:var(--blu)}
 dialog{border:1px solid var(--ln);border-radius:16px;background:var(--card);color:var(--tx);max-width:560px;width:92vw;padding:20px}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 dialog h2{margin:0 0 6px;font-size:18px}dialog p{font-size:13px;color:var(--mu);margin:6px 0}
@@ -52,8 +51,8 @@ dialog input[type=text]{width:100%;margin-top:4px;padding:9px 10px;border:1px so
 </head>
 <body>
 <header>
-  <h1>Janela Bar · Análises<small id="meta"></small></h1>
-  <div class="right"><nav id="menu"></nav><button id="syncb" type="button" title="Fontes de dados (Dropbox e clima)">⟳ <span id="synct">Dados</span></button><button id="theme" type="button" aria-pressed="false">☾ Tema escuro</button></div>
+  <h1>Janela Bar · Análises<small id="meta"></small><small id="syncb"><span id="synct"></span></small></h1>
+  <div class="right"><nav id="menu"></nav><button id="theme" type="button" aria-pressed="false">☾ Tema escuro</button></div>
 </header>
 <main>
   <aside class="cal" id="cal"></aside>
@@ -646,6 +645,7 @@ self.onmessage = async function (e) {
   } catch (err) { self.postMessage({ erro: String((err && err.message) || err) }); }
 };
 </script>
+<script type="text/plain" id="cfgdbx">https://www.dropbox.com/scl/fi/xv93qy8t293au22unojov/Por-venda_2026.xlsm?rlkey=gtyk5at1kta87k5rlioktgwxb&st=z074msf2&dl=0</script>
 <script type="text/plain" id="climacsv">noite,dia_semana,horas_com_dado,chuva_total_mm,chuva_17_21_mm,chuva_21_01_mm,chuva_01_05_mm,horas_com_chuva,chuva_max_hora_mm,rajada_max_kmh,vento_medio_kmh,vento_medio_20_24_kmh,direcao_na_rajada_max,temp_20h_c,temp_min_c,sensacao_20h_c,sensacao_min_c,umidade_media_pct,nuvens_media_pct,fonte
 2025-01-01,3,12,"3,1","2,6","0,5","0,0","5,0","2,4","31,3","5,4","3,1","78,0","23,1","22,4","27,8","26,5","91,7","71,25",open-meteo ecmwf_ifs arquivo
 2025-01-02,4,12,"1,0","1,0","0,0","0,0","3,0","0,6","24,1","7,7","6,0","322,0","23,9","21,4","28,7","24,5","93,4",57,open-meteo ecmwf_ifs arquivo
@@ -2014,6 +2014,7 @@ const $ = id => document.getElementById(id);
 const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const CLIMA_ID = '1YjiBn_AnGgIYekeFSx2lFl8TdbfoJk_ceAqKaaJVF9A', CLIMA_ABA = 'CLIMA_NOITE';
 let rodando = false;
+const link = () => LS.get('janela.dropbox') || A.txt('cfgdbx').trim();
 
 /* ---- cache no navegador (IndexedDB) ---- */
 const idb = () => new Promise((res, rej) => { const r = indexedDB.open('janela-analises', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
@@ -2021,7 +2022,7 @@ async function kvGet(k) { try { const db = await idb(); return await new Promise
 async function kvSet(k, v) { try { const db = await idb(); await new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = () => rej(t.error); }); } catch (e) {} }
 
 /* ---- interface ---- */
-function status(txt, cls) { const b = $('syncb'); b.className = cls || ''; $('synct').textContent = txt; b.title = txt; }
+function status(txt, cls) { const b = $('syncb'); b.className = cls || ''; $('synct').textContent = txt; b.title = cls === 'err' ? 'Clique para ver o detalhe' : txt; }
 function msg(txt, erro) { const m = $('fmsg'); m.textContent = txt || ''; m.style.color = erro ? '#c0392b' : ''; }
 function barra(p) { const b = $('fbar'); b.hidden = p == null; if (p != null) $('fbari').style.width = Math.round(p * 100) + '%'; }
 const hh = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
@@ -2085,8 +2086,8 @@ async function atualizar(origem, arquivoLocal) {
     let buf;
     if (arquivoLocal) { status('Lendo arquivo…', 'run'); buf = await arquivoLocal.arrayBuffer(); }
     else {
-      const url = dropboxUrls(LS.get('janela.dropbox'));
-      if (!url.length) { status('Configurar fonte de dados', 'err'); return; }
+      const url = dropboxUrls(link());
+      if (!url.length) { status('Fonte de dados não configurada · clique aqui', 'err'); return; }
       status('Baixando vendas…', 'run'); barra(0);
       buf = await baixar(url, (g, t) => { const p = t ? g / t : 0; status('Baixando vendas… ' + (g / 1048576).toFixed(0) + (t ? '/' + (t / 1048576).toFixed(0) : '') + ' MB', 'run'); barra(p * 0.3); });
     }
@@ -2115,7 +2116,7 @@ async function atualizar(origem, arquivoLocal) {
 }
 
 /* ---- dialogo ---- */
-function abrir() { $('fate').textContent = dm(A.dados().meta.ultima_venda); $('fdbx').value = LS.get('janela.dropbox') || ''; $('fclm').value = LS.get('janela.clima') || CLIMA_ID; if (!$('dlg').open) $('dlg').showModal(); }
+function abrir() { $('fate').textContent = dm(A.dados().meta.ultima_venda); $('fdbx').value = link(); $('fclm').value = LS.get('janela.clima') || CLIMA_ID; if (!$('dlg').open) $('dlg').showModal(); }
 $('syncb').onclick = abrir;
 $('fclose').onclick = () => $('dlg').close();
 $('fsave').onclick = () => { LS.set('janela.dropbox', $('fdbx').value.trim()); LS.set('janela.clima', $('fclm').value.trim()); msg(''); atualizar('manual'); };
@@ -2128,7 +2129,7 @@ $('ffile').onchange = e => { const f = e.target.files[0]; if (f) { LS.set('janel
     const a = cache.DADOS.meta, b = A.dados().meta;
     if ((a.ultima_venda + '|' + (a.clima_ate || '')) >= (b.ultima_venda + '|' + (b.clima_ate || ''))) A.aplicar(cache.DADOS, cache.PROD);
   }
-  if (!LS.get('janela.dropbox')) { status('Configurar fonte de dados', 'err'); abrir();  return; }
+  if (!link()) { status('Fonte de dados não configurada · clique aqui', 'err'); return; }
   atualizar('abertura');
 })();
 })();
