@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Janela Bar · Análises</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2330;--mut:#6b7587;--line:#e3e7ee;--acc:#1f6feb;--acc2:#0b3d91;--pos:#127a3e;--neg:#b42318;--warn:#b25e09;--hi:#dbe8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--acc2);color:#fff;padding:12px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+header h1{font-size:17px;margin:0;font-weight:700}header small{opacity:.8;display:block;font-weight:400;font-size:12px}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;padding:8px 14px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+nav button.on{background:#fff;color:var(--acc2)}
+main{max-width:1180px;margin:0 auto;padding:16px;display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.two>*{min-width:0}.card{min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.cal h3{margin:0 0 8px;font-size:14px;display:flex;align-items:center;justify-content:space-between}
+.cal h3 button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 10px;cursor:pointer;font-size:15px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.dw{font-size:11px;color:var(--mut);text-align:center;padding:2px 0}
+.day{aspect-ratio:1/1.05;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;color:#b9c0cc;border:1px solid transparent;line-height:1.1}
+.day.ok{background:var(--hi);color:var(--acc2);font-weight:700;cursor:pointer}
+.day.ok small{font-size:9px;font-weight:500;color:var(--mut)}
+.day.ok:hover{border-color:var(--acc)}
+.day.sel{background:var(--acc);color:#fff}.day.sel small{color:#dbe8ff}.day.selq{background:#9ec1ff;color:var(--acc2)}
+.day.nodata{color:#d3d8e0}
+.legend{font-size:12px;color:var(--mut);margin-top:10px}
+.title h2{margin:0 0 4px;font-size:22px}.title p{margin:0;color:var(--mut)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin:14px 0}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.kpi b{display:block;font-size:12px;color:var(--mut);font-weight:600}
+.kpi .v{font-size:22px;font-weight:700;margin:2px 0}
+.kpi .c{font-size:12px;color:var(--mut)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.sec{margin-top:14px}.sec h3{margin:0 0 2px;font-size:16px}.sec .sub{color:var(--mut);font-size:12px;margin-bottom:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:860px){.two{grid-template-columns:1fr}}
+.ch{position:relative;height:260px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:600;font-size:12px}
+.note{background:#fff8e6;border:1px solid #f1dca0;color:#6b4a00;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:12px}
+.stats{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--mut);margin:4px 0 8px}.stats b{color:var(--ink)}
+.empty{padding:40px;text-align:center;color:var(--mut)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Janela Bar · Análises<small id="meta"></small></h1>
+  <nav id="menu"></nav>
+</header>
+<main>
+  <aside class="card cal" id="cal"></aside>
+  <section id="rep"><div class="empty">Carregando…</div></section>
+</main>
+<script src="chart.umd.js"></script>
+<script src="data/dados.js"></script>
+<script>
+(function(){
+'use strict';
+const D=window.DADOS,N=D.nights,Q=D.quinzenas;
+const byDate={};N.forEach(n=>byDate[n.d]=n);
+const MES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const DOWN=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+const DOWS=['D','S','T','Q','Q','S','S'];
+const OPTS=[
+ {id:'sex',nome:'Sexta',dows:[5]},{id:'sab',nome:'Sábado',dows:[6]},{id:'dom',nome:'Domingo',dows:[0]},
+ {id:'tqq',nome:'Ter · Qua · Qui',dows:[2,3,4]},{id:'q1',nome:'1ª Quinzena',quinz:true}];
+const HL=['17h','18h','19h','20h','21h','22h','23h','00h','01h','02h','03h','04h','05h'];
+const brl=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
+const brl2=v=>'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const int=v=>Math.round(v).toLocaleString('pt-BR');
+const pc=(a,b)=>b?((a/b-1)*100):null;
+const fpc=p=>p==null?'—':(p>=0?'+':'')+p.toFixed(1).replace('.',',')+'%';
+const cls=p=>p==null?'':(p>=0?'pos':'neg');
+const dstr=d=>{const [y,m,dd]=d.split('-');return dd+'/'+m+'/'+y};
+const addDays=(d,k)=>{const t=new Date(d+'T12:00:00');t.setDate(t.getDate()+k);return t.toISOString().slice(0,10)};
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+const sd=a=>{if(a.length<2)return 0;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1))};
+const median=a=>{const s=[...a].sort((x,y)=>x-y),n=s.length;return n?(n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2):0};
+const sum=a=>a.reduce((s,x)=>s+x,0);
+
+let opt=OPTS[0],selDate=null,selMonth=null,viewY,viewM,charts=[];
+function killCharts(){charts.forEach(c=>c.destroy());charts=[]}
+function mk(id,cfg){const el=document.getElementById(id);if(!el)return;const c=new Chart(el,cfg);charts.push(c);return c}
+Chart.defaults.font.family='system-ui,-apple-system,Segoe UI,Roboto,sans-serif';Chart.defaults.font.size=11;
+
+/* ---------- menu ---------- */
+function drawMenu(){
+  const m=document.getElementById('menu');m.innerHTML='';
+  OPTS.forEach(o=>{const b=document.createElement('button');b.textContent=o.nome;b.className=o.id===opt.id?'on':'';
+    b.onclick=()=>choose(o);m.appendChild(b)});
+}
+function datesOf(o){return o.quinz?null:N.filter(n=>o.dows.includes(n.dow)&&n.g>0).map(n=>n.d)}
+function choose(o){
+  opt=o;drawMenu();
+  if(o.quinz){
+    const last=Q.filter(q=>q.q==='1').slice(-1)[0];selMonth=last.m;viewY=+last.m.slice(0,4);viewM=+last.m.slice(5)-1;
+  }else{const ds=datesOf(o);selDate=ds[ds.length-1];viewY=+selDate.slice(0,4);viewM=+selDate.slice(5,7)-1}
+  drawCal();drawReport();
+}
+
+/* ---------- calendário ---------- */
+function drawCal(){
+  const el=document.getElementById('cal');
+  let h='<h3><button id="pv">‹</button><span>'+MES[viewM]+' '+viewY+'</span><button id="nx">›</button></h3><div class="grid">';
+  DOWS.forEach(x=>h+='<div class="dw">'+x+'</div>');
+  const first=new Date(viewY,viewM,1).getDay(),nd=new Date(viewY,viewM+1,0).getDate();
+  for(let i=0;i<first;i++)h+='<div></div>';
+  const mk2=viewY+'-'+String(viewM+1).padStart(2,'0');
+  for(let d=1;d<=nd;d++){
+    const ds=mk2+'-'+String(d).padStart(2,'0'),dow=new Date(viewY,viewM,d).getDay();let c='day',sub='',att='';
+    if(opt.quinz){
+      const q=Q.find(x=>x.m===mk2&&x.q==='1');
+      if(q&&d<=15){c+=' ok'+(selMonth===mk2?' selq':'');att=' data-m="'+mk2+'"'}else c+=' nodata';
+    }else if(opt.dows.includes(dow)){
+      const n=byDate[ds];
+      if(n&&n.g>0){c+=' ok'+(ds===selDate?' sel':'');sub='<small>'+(n.g/1000).toFixed(1).replace('.',',')+'k</small>';att=' data-d="'+ds+'"'}else c+=' nodata';
+    }else c+=' nodata';
+    h+='<div class="'+c+'"'+att+'>'+d+sub+'</div>';
+  }
+  h+='</div><div class="legend">'+(opt.quinz?'Dias 1 a 15 do mês (até 05h de 15/MM) formam a 1ª quinzena. Clique para escolher o mês.':'Em azul: '+(opt.dows.map(x=>DOWN[x].toLowerCase()+'s').join(', '))+' com vendas. Valor = faturamento bruto da noite. A noite vai das 17h às 05h do dia seguinte.')+'</div>';
+  el.innerHTML=h;
+  document.getElementById('pv').onclick=()=>{viewM--;if(viewM<0){viewM=11;viewY--}drawCal()};
+  document.getElementById('nx').onclick=()=>{viewM++;if(viewM>11){viewM=0;viewY++}drawCal()};
+  el.querySelectorAll('.day.ok').forEach(x=>x.onclick=()=>{
+    if(x.dataset.m){selMonth=x.dataset.m}else{selDate=x.dataset.d}
+    drawCal();drawReport();});
+}
+
+/* ---------- Gauss ---------- */
+function pdf(x,m,s){return Math.exp(-0.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI))}
+function gaussBlock(id,vals,labels,cur,curLabel){
+  const m=mean(vals),s=sd(vals)||1,z=(cur-m)/s;
+  const lo=Math.min(m-3.2*s,Math.min(...vals,cur)-s*.3),hi=Math.max(m+3.2*s,Math.max(...vals,cur)+s*.3);
+  const curve=[];for(let i=0;i<=80;i++){const x=lo+(hi-lo)*i/80;curve.push({x,y:pdf(x,m,s)})}
+  const pts=vals.map((v,i)=>({x:v,y:pdf(v,m,s),l:labels[i]}));
+  mk(id,{type:'scatter',data:{datasets:[
+    {label:'Distribuição normal',data:curve,showLine:true,pointRadius:0,borderColor:'#9aa6bb',borderWidth:2},
+    {label:'Noites anteriores',data:pts,pointRadius:3.5,backgroundColor:'#1f6feb99',borderColor:'#1f6feb'},
+    {label:curLabel,data:[{x:cur,y:pdf(cur,m,s),l:curLabel}],pointStyle:'star',pointRadius:11,backgroundColor:'#e8590c',borderColor:'#e8590c'}]},
+   options:{maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10}},
+     tooltip:{callbacks:{label:c=>c.dataset.label==='Distribuição normal'?'':((c.raw.l||'')+': '+brl(c.raw.x))}}},
+     scales:{x:{type:'linear',min:lo,max:hi,ticks:{callback:v=>brl(v)}},y:{display:false}}}});
+  return {m,s,z,min:Math.min(...vals),max:Math.max(...vals),n:vals.length};
+}
+const zTxt=z=>(z>=0?'+':'')+z.toFixed(2).replace('.',',');
+
+/* ---------- relatório da noite ---------- */
+function peersOf(n,days){
+  const lo=addDays(n.d,-days);
+  return N.filter(x=>x.dow===n.dow&&x.d<n.d&&x.d>=lo&&x.g>0);
+}
+function loadProd(month,cb){
+  if(window.PROD&&window.PROD[month])return cb(window.PROD[month]);
+  const s=document.createElement('script');s.src='data/prod/'+month+'.js';s.onload=()=>cb(window.PROD[month]);s.onerror=()=>cb(null);document.head.appendChild(s);
+}
+function reportNight(){
+  const n=byDate[selDate],rep=document.getElementById('rep');killCharts();
+  const prev8=N.filter(x=>x.dow===n.dow&&x.d<n.d&&x.g>0).slice(-8);
+  const ya=byDate[addDays(n.d,-364)];
+  const tk=x=>x.v?x.g/x.v:0;
+  const m8=k=>prev8.length?mean(prev8.map(x=>typeof k==='function'?k(x):x[k])):0;
+  const kp=(t,v,fmt,a8,ay)=>'<div class="kpi"><b>'+t+'</b><div class="v">'+fmt(v)+'</div><div class="c">vs 8 anteriores <span class="'+cls(pc(v,a8))+'">'+fpc(pc(v,a8))+'</span>'+(ay?' · vs '+dstr(ya.d).slice(0,5)+'/'+ya.d.slice(2,4)+' <span class="'+cls(pc(v,ay))+'">'+fpc(pc(v,ay))+'</span>':'')+'</div></div>';
+  let h='<div class="card title"><h2>'+DOWN[n.dow]+', '+dstr(n.d)+': '+brl(n.g)+' de faturamento bruto</h2><p>Noite operacional das 17h de '+dstr(n.d)+' às 05h de '+dstr(addDays(n.d,1))+'. Faturamento = coluna Total R$ da planilha, antes das taxas (balcão + iFood).</p></div>';
+  h+='<div class="kpis">'+
+   kp('Faturamento bruto',n.g,brl,m8('g'),ya&&ya.g)+
+   kp('Vendas',n.v,int,m8('v'),ya&&ya.v)+
+   kp('Ticket médio',tk(n),brl2,m8(tk),ya&&tk(ya))+
+   kp('Drinks',n.dr,int,m8('dr'),ya&&ya.dr)+
+   kp('Chopes (copos)',n.ch,int,m8('ch'),ya&&ya.ch)+
+   kp('Pedidos iFood',n.vi,int,m8('vi'),ya&&ya.vi)+'</div>';
+  h+='<div class="two"><div class="card"><div class="sec" style="margin:0"><h3>Faturamento por canal</h3><div class="sub">Balcão e iFood nesta noite</div>'+
+     '<table><tr><th></th><th>Hoje</th><th>Média 8 ant.</th><th>Var.</th></tr>'+
+     '<tr><td>Balcão</td><td>'+brl(n.gb)+'</td><td>'+brl(m8('gb'))+'</td><td class="'+cls(pc(n.gb,m8('gb')))+'">'+fpc(pc(n.gb,m8('gb')))+'</td></tr>'+
+     '<tr><td>iFood</td><td>'+brl(n.gi)+'</td><td>'+brl(m8('gi'))+'</td><td class="'+cls(pc(n.gi,m8('gi')))+'">'+fpc(pc(n.gi,m8('gi')))+'</td></tr>'+
+     '<tr><td>Vendas balcão</td><td>'+int(n.vb)+'</td><td>'+int(m8('vb'))+'</td><td class="'+cls(pc(n.vb,m8('vb')))+'">'+fpc(pc(n.vb,m8('vb')))+'</td></tr></table></div></div>'+
+     '<div class="card" id="wbox"></div></div>';
+  h+='<div class="card sec"><h3>Curva de Gauss — '+DOWN[n.dow].toLowerCase()+'s</h3><div class="sub">Cada ponto é uma noite anterior do mesmo dia da semana; ★ é a noite escolhida. Z mede quantos desvios-padrão ela está da média.</div><div class="two">'+
+     '<div><b>Referência de 12 meses</b><div class="stats" id="g12s"></div><div class="ch"><canvas id="g12"></canvas></div></div>'+
+     '<div><b>Referência de 3 meses</b><div class="stats" id="g3s"></div><div class="ch"><canvas id="g3"></canvas></div></div></div></div>';
+  h+='<div class="card sec"><h3>Hora a hora</h3><div class="sub">Faturamento bruto por hora de início da venda, comparado à média das 8 noites anteriores</div><div class="ch" style="height:300px"><canvas id="hr"></canvas></div></div>';
+  h+='<div class="card sec"><h3>'+DOWN[n.dow]+' × '+DOWN[n.dow].toLowerCase()+': as quatro mais recentes</h3><div class="sub">&nbsp;</div><table id="t4"></table></div>';
+  h+='<div class="card sec"><h3>Tendência: '+DOWN[n.dow].toLowerCase()+'s dos últimos 12 meses</h3><div class="ch"><canvas id="tr"></canvas></div></div>';
+  h+='<div class="card sec"><h3>Produtos</h3><div class="sub">Volume e faturamento bruto na noite</div><div id="prod">Carregando…</div></div>';
+  h+='<div class="note">A comparação mede faturamento. O efeito de clima, feriados ou eventos não é isolado: o clima abaixo mostra associação, não causa.</div>';
+  rep.innerHTML=h;
+
+  // clima
+  const w=n.w,wb=document.getElementById('wbox');
+  if(w){
+    const pw=N.filter(x=>x.dow===n.dow&&x.w&&x.w.ch!=null&&x.g>0&&x.d<n.d);
+    const mr=pw.length?mean(pw.map(x=>x.w.ch)):0;
+    wb.innerHTML='<div class="sec" style="margin:0"><h3>Clima da noite (17h–05h)</h3><div class="sub">Open-Meteo · modelo ecmwf_ifs · Paranaguá. É previsão/reanálise, não medição local.</div>'+
+      '<table><tr><td>Chuva total</td><td>'+(w.ch??0).toLocaleString('pt-BR')+' mm</td></tr>'+
+      '<tr><td>17–21h · 21–01h · 01–05h</td><td>'+[w.c1,w.c2,w.c3].map(x=>(x??0).toLocaleString('pt-BR')).join(' · ')+' mm</td></tr>'+
+      '<tr><td>Horas com chuva</td><td>'+int(w.hc??0)+' h</td></tr>'+
+      '<tr><td>Rajada máx. · vento médio</td><td>'+int(w.raj??0)+' · '+int(w.vm??0)+' km/h</td></tr>'+
+      '<tr><td>Temperatura 20h · mínima</td><td>'+int(w.t20??0)+'° · '+int(w.tmin??0)+'°C</td></tr>'+
+      '<tr><td>Chuva média das '+DOWN[n.dow].toLowerCase()+'s anteriores</td><td>'+mr.toFixed(1).replace('.',',')+' mm</td></tr></table></div>';
+  }else wb.innerHTML='<div class="sec" style="margin:0"><h3>Clima</h3><div class="sub">Sem dado de clima para esta noite.</div></div>';
+
+  // gauss
+  const set=(id,vals,labels,days)=>{
+    if(vals.length<3){document.getElementById(id+'s').textContent='Poucas noites para a referência.';return}
+    const r=gaussBlock(id,vals,labels,n.g,dstr(n.d));
+    document.getElementById(id+'s').innerHTML='<span>'+r.n+' noites</span><span>Média <b>'+brl(r.m)+'</b></span><span>Desvio <b>'+brl(r.s)+'</b></span><span>Mín <b>'+brl(r.min)+'</b></span><span>Máx <b>'+brl(r.max)+'</b></span><span>Z desta noite <b>'+zTxt(r.z)+'</b></span>';
+  };
+  const p12=peersOf(n,365),p3=peersOf(n,92);
+  set('g12',p12.map(x=>x.g),p12.map(x=>dstr(x.d)));set('g3',p3.map(x=>x.g),p3.map(x=>dstr(x.d)));
+
+  // hora a hora
+  const avgH=HL.map((_,i)=>prev8.length?mean(prev8.map(x=>x.hg[i])):0);
+  mk('hr',{type:'bar',data:{labels:HL,datasets:[
+    {label:dstr(n.d),data:n.hg.slice(0,13),backgroundColor:'#1f6feb'},
+    {label:'Média 8 anteriores',data:avgH,backgroundColor:'#c3ccdb'}]},
+    options:{maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>brl(v)}}},plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(c.raw)}}}}});
+
+  // 4 mais recentes
+  const last4=N.filter(x=>x.dow===n.dow&&x.d<=n.d&&x.g>0).slice(-4).reverse();
+  let t='<tr><th></th>'+last4.map(x=>'<th>'+dstr(x.d).slice(0,5)+'</th>').join('')+'</tr>';
+  const row=(l,f)=>'<tr><td>'+l+'</td>'+last4.map(x=>'<td>'+f(x)+'</td>').join('')+'</tr>';
+  t+=row('Faturamento bruto',x=>brl(x.g))+row('Balcão',x=>brl(x.gb))+row('iFood',x=>brl(x.gi))+row('Vendas',x=>int(x.v))+row('Ticket médio',x=>brl2(tk(x)))+row('Drinks',x=>int(x.dr))+row('Chopes (copos)',x=>int(x.ch))+row('Chuva (mm)',x=>x.w?(x.w.ch??0).toLocaleString('pt-BR'):'—');
+  document.getElementById('t4').innerHTML=t;
+
+  // tendência
+  const tr=peersOf({d:addDays(n.d,1),dow:n.dow},365);
+  mk('tr',{type:'line',data:{labels:tr.map(x=>dstr(x.d).slice(0,5)+'/'+x.d.slice(2,4)),datasets:[
+    {label:'Faturamento bruto',data:tr.map(x=>x.g),borderColor:'#1f6feb',backgroundColor:'#1f6feb22',fill:true,tension:.25,pointRadius:tr.map(x=>x.d===n.d?7:2.5),pointBackgroundColor:tr.map(x=>x.d===n.d?'#e8590c':'#1f6feb')},
+    {label:'Média do período',data:tr.map(()=>mean(tr.map(x=>x.g))),borderColor:'#9aa6bb',borderDash:[6,4],pointRadius:0}]},
+    options:{maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>brl(v)}},x:{ticks:{maxTicksLimit:14}}},plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(c.raw)}}}}});
+
+  // produtos
+  loadProd(n.d.slice(0,7),P=>{
+    const el=document.getElementById('prod');if(!el)return;
+    const L=P&&P[n.d];if(!L){el.textContent='Sem detalhe de produtos.';return}
+    const tot=sum(L.map(x=>x[3])),top=[...L].sort((a,b)=>b[3]-a[3]).slice(0,20);
+    el.innerHTML='<table><tr><th>#</th><th>Produto</th><th>Grupo</th><th>Qtd.</th><th>Faturamento</th><th>% do total</th></tr>'+
+      top.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+x[0]+'</td><td>'+x[1]+'</td><td>'+int(x[2])+'</td><td>'+brl(x[3])+'</td><td>'+(x[3]/tot*100).toFixed(1).replace('.',',')+'%</td></tr>').join('')+'</table>';
+  });
+}
+
+/* ---------- relatório da quinzena ---------- */
+function reportQuinz(){
+  killCharts();const rep=document.getElementById('rep');
+  const all=Q.filter(q=>q.q==='1'),idx=all.findIndex(q=>q.m===selMonth),q=all[idx];
+  const ant=all.slice(Math.max(0,idx-12),idx),ya=all.find(x=>x.m===(+selMonth.slice(0,4)-1)+selMonth.slice(4));
+  const last13=all.slice(Math.max(0,idx-12),idx+1);
+  const lbl=m=>MES[+m.slice(5)-1].slice(0,3)+'/'+m.slice(2,4);
+  const tk=x=>x.vb?x.gb/x.vb:0;
+  const med=f=>ant.length?median(ant.map(f)):0;
+  const parcial=D.meta.ultima_venda<q.fim;
+  const kp=(t,v,fmt,f)=>{const md=med(f),y=ya?f(ya):0;return '<div class="kpi"><b>'+t+'</b><div class="v">'+fmt(v)+'</div><div class="c">vs mediana 12 ant. <span class="'+cls(pc(v,md))+'">'+fpc(pc(v,md))+'</span>'+(ya?' · vs '+lbl(ya.m)+' <span class="'+cls(pc(v,y))+'">'+fpc(pc(v,y))+'</span>':'')+'</div></div>'};
+  let h='<div class="card title"><h2>1ª quinzena de '+MES[+selMonth.slice(5)-1]+'/'+selMonth.slice(0,4)+': '+brl(q.g)+' em bruto</h2><p>De '+dstr(q.ini.slice(0,10))+' 00h a '+dstr(q.fim.slice(0,10))+' 05h · '+q.noites+' noites · última venda: '+q.ult.slice(8,10)+'/'+q.ult.slice(5,7)+' '+q.ult.slice(11)+'. Faturamento = Total R$, antes das taxas.'+(parcial?' <b>Quinzena ainda em andamento.</b>':'')+'</p></div>';
+  h+='<div class="kpis">'+kp('Faturamento total',q.g,brl,x=>x.g)+kp('Balcão',q.gb,brl,x=>x.gb)+kp('iFood',q.gi,brl,x=>x.gi)+
+    kp('Vendas de balcão',q.vb,int,x=>x.vb)+kp('Ticket balcão',tk(q),brl2,tk)+kp('Chopes (copos)',q.ch,int,x=>x.ch)+kp('Drinks',q.dr,int,x=>x.dr)+
+    '<div class="kpi"><b>Ranking</b><div class="v">'+(1+all.filter(x=>x.g>q.g&&all.indexOf(x)>=idx-12&&all.indexOf(x)<=idx).length)+'ª de '+last13.length+'</div><div class="c">no faturamento total, entre as '+last13.length+' quinzenas exibidas</div></div></div>';
+  h+='<div class="card sec"><h3>Faturamento por quinzena</h3><div class="sub">Balcão + iFood nas '+last13.length+' primeiras quinzenas até a escolhida · linha = mediana das 12 anteriores</div><div class="ch" style="height:300px"><canvas id="qf"></canvas></div></div>';
+  h+='<div class="two"><div class="card sec"><h3>Vendas</h3><div class="sub">Balcão + iFood</div><div class="ch"><canvas id="qv"></canvas></div></div><div class="card sec"><h3>Chopp (copos)</h3><div class="sub">Por quinzena</div><div class="ch"><canvas id="qc"></canvas></div></div></div>';
+  h+='<div class="card sec"><h3>Evolução por horário (balcão)</h3><div class="sub">Vendas de balcão por hora de início · quinzena escolhida, mesma quinzena do ano anterior e mediana das 12</div><div class="ch" style="height:300px"><canvas id="qh"></canvas></div></div>';
+  h+='<div class="card sec"><h3>Distribuição normal — 1ª quinzena</h3><div class="sub">Pontos = as 12 quinzenas anteriores; ★ = quinzena escolhida</div><div class="stats" id="qgs"></div><div class="ch"><canvas id="qg"></canvas></div></div>';
+  h+='<div class="card sec"><h3>Clima nas noites da quinzena</h3><div id="qw"></div></div>';
+  h+='<div class="note">Esta versão cobre quinzena em números e gráficos. O diagnóstico escrito e os cenários de recuperação do relatório manual ainda não foram automatizados.</div>';
+  rep.innerHTML=h;
+  const labels=last13.map(x=>lbl(x.m));
+  const medLine=f=>last13.map(()=>med(f));
+  const cur=last13.map(x=>x.m===selMonth);
+  const col=(a,b)=>last13.map(x=>x.m===selMonth?a:b);
+  mk('qf',{type:'bar',data:{labels,datasets:[
+    {label:'Balcão',data:last13.map(x=>x.gb),backgroundColor:col('#1f6feb','#9db9ea'),stack:'a'},
+    {label:'iFood',data:last13.map(x=>x.gi),backgroundColor:col('#e8590c','#f3b895'),stack:'a'},
+    {type:'line',label:'Mediana 12 ant. (total)',data:medLine(x=>x.g),borderColor:'#1c2330',borderDash:[6,4],pointRadius:0,borderWidth:1.5}]},
+    options:{maintainAspectRatio:false,scales:{y:{stacked:true,ticks:{callback:v=>brl(v)}},x:{stacked:true}},plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(c.raw)}}}}});
+  mk('qv',{type:'bar',data:{labels,datasets:[{label:'Vendas',data:last13.map(x=>x.v),backgroundColor:col('#1f6feb','#9db9ea')},
+    {type:'line',label:'Mediana 12 ant.',data:medLine(x=>x.v),borderColor:'#1c2330',borderDash:[6,4],pointRadius:0}]},options:{maintainAspectRatio:false}});
+  mk('qc',{type:'bar',data:{labels,datasets:[{label:'Copos',data:last13.map(x=>x.ch),backgroundColor:col('#127a3e','#a9d6bb')},
+    {type:'line',label:'Mediana 12 ant.',data:medLine(x=>x.ch),borderColor:'#1c2330',borderDash:[6,4],pointRadius:0}]},options:{maintainAspectRatio:false}});
+  const mh=HL.map((_,i)=>ant.length?median(ant.map(x=>x.hvb[i])):0);
+  mk('qh',{type:'bar',data:{labels:HL,datasets:[
+    {label:lbl(q.m),data:q.hvb.slice(0,13),backgroundColor:'#1f6feb'},
+    ...(ya?[{label:lbl(ya.m),data:ya.hvb.slice(0,13),backgroundColor:'#e8590c99'}]:[]),
+    {label:'Mediana 12 ant.',data:mh,backgroundColor:'#c3ccdb'}]},options:{maintainAspectRatio:false}});
+  if(ant.length>=3){const r=gaussBlock('qg',ant.map(x=>x.g),ant.map(x=>lbl(x.m)),q.g,lbl(q.m));
+    document.getElementById('qgs').innerHTML='<span>'+r.n+' quinzenas</span><span>Média <b>'+brl(r.m)+'</b></span><span>Desvio <b>'+brl(r.s)+'</b></span><span>Mín <b>'+brl(r.min)+'</b></span><span>Máx <b>'+brl(r.max)+'</b></span><span>Z <b>'+zTxt(r.z)+'</b></span>'}
+  // clima
+  const inQ=x=>x.d>=q.ini.slice(0,10)&&x.d<=addDays(q.fim.slice(0,10),-1)&&x.w;
+  const nq=N.filter(inQ);const chu=nq.filter(x=>x.w.ch>=1);
+  const wq=m=>{const a=N.filter(x=>x.d.slice(0,7)===m&&+x.d.slice(8)<=14&&x.w);return a};
+  const sa=wq(selMonth),sy=ya?wq(ya.m):[];
+  const fmt=a=>a.length?'<td>'+a.length+'</td><td>'+a.filter(x=>x.w.ch>=1).length+'</td><td>'+sum(a.map(x=>x.w.ch||0)).toFixed(0)+' mm</td><td>'+(a.filter(x=>x.w.ch>=1).length?brl(mean(a.filter(x=>x.w.ch>=1).map(x=>x.g))):'—')+'</td><td>'+(a.filter(x=>x.w.ch<1).length?brl(mean(a.filter(x=>x.w.ch<1).map(x=>x.g))):'—')+'</td>':'<td colspan="5">sem dado</td>';
+  document.getElementById('qw').innerHTML='<div class="sub">Noites com chuva = 1 mm ou mais entre 17h e 05h (Open-Meteo, ecmwf_ifs). Faturamento médio comparado entre noites com e sem chuva dentro da quinzena: associação, não prova de causa.</div>'+
+    '<table><tr><th></th><th>Noites</th><th>Com chuva</th><th>Chuva total</th><th>Fat. médio noite c/ chuva</th><th>Fat. médio noite s/ chuva</th></tr>'+
+    '<tr><td>'+lbl(selMonth)+'</td>'+fmt(sa)+'</tr>'+(ya?'<tr><td>'+lbl(ya.m)+'</td>'+fmt(sy)+'</tr>':'')+'</table>';
+}
+
+function drawReport(){opt.quinz?reportQuinz():reportNight()}
+
+document.getElementById('meta').textContent='Última venda: '+dstr(D.meta.ultima_venda.slice(0,10))+' '+D.meta.ultima_venda.slice(11)+' · clima até '+(D.meta.clima_ate?dstr(D.meta.clima_ate):'—')+' · dados gerados em '+dstr(D.meta.gerado.slice(0,10))+' '+D.meta.gerado.slice(11);
+choose(OPTS[0]);
+})();
+</script>
+</body>
+</html>
