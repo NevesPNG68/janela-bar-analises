@@ -60,12 +60,13 @@ dialog input[type=text]{width:100%;margin-top:4px;padding:9px 10px;border:1px so
   <section><iframe id="rep" title="Relatório"></iframe></section>
 </main>
 
-<dialog id="dlg"><h2>Fontes de dados</h2>
-<p>O painel lê a planilha de vendas no Dropbox e o clima na planilha do Google toda vez que é aberto. Os endereços ficam salvos só neste navegador.</p>
-<label for="fdbx">Link da planilha de vendas no Dropbox (compartilhar → copiar link)</label><input type="text" id="fdbx" placeholder="https://www.dropbox.com/scl/fi/.../Por_venda_2026.xlsm?rlkey=...&dl=0" autocomplete="off">
-<label for="fclm">Planilha de clima no Google (ID ou link da JANELA_CLIMA_BASE)</label><input type="text" id="fclm" autocomplete="off">
+<dialog id="dlg"><h2>Ligar o painel ao Dropbox</h2>
+<p><b>Falta só um passo, feito uma única vez neste computador.</b> Hoje o painel mostra os dados guardados até <span id="fate"></span>. Para ele buscar sozinho as vendas novas toda vez que abrir:</p>
+<p><b>1.</b> No Dropbox, ache o arquivo <b>Por_venda_2026.xlsm</b>, clique em <b>Compartilhar</b> → <b>Copiar link</b>.<br><b>2.</b> Cole o link no campo abaixo.<br><b>3.</b> Clique em <b>Salvar e atualizar agora</b> e aguarde (leva cerca de 1 minuto na primeira vez).</p>
+<label for="fdbx">Link do arquivo no Dropbox</label><input type="text" id="fdbx" placeholder="Cole aqui o link copiado do Dropbox" autocomplete="off">
+<label for="fclm">Planilha de clima no Google (já preenchida, não precisa mexer)</label><input type="text" id="fclm" autocomplete="off">
 <p id="fmsg"></p><div class="bar" id="fbar" hidden><i id="fbari"></i></div>
-<div class="dbtn"><button type="button" class="pri" id="fsave">Salvar e atualizar agora</button><label for="ffile">Escolher arquivo .xlsm do computador<input type="file" id="ffile" accept=".xlsm,.xlsx" hidden></label><button type="button" id="fclose">Fechar</button></div></dialog>
+<div class="dbtn"><button type="button" class="pri" id="fsave">Salvar e atualizar agora</button><label for="ffile">Prefiro escolher o arquivo no computador<input type="file" id="ffile" accept=".xlsm,.xlsx" hidden></label><button type="button" id="fclose">Fechar</button></div></dialog>
 <script type="text/plain" id="chartsrc">/*!
  * Chart.js v4.4.1
  * https://www.chartjs.org
@@ -161,6 +162,8 @@ body{overflow-y:hidden}
 ul.ck{margin:0;padding-left:20px}
 
 @media(min-width:700px){.four-saturdays{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+
+.wrap{margin:0!important;padding-left:8px!important}
 </script>
 <script type="text/plain" id="relcssq">
 :root{color-scheme:light;--bg:#f3f5f9;--card:#ffffff;--card2:#eaf0f7;--ln:#d4dce7;--tx:#192538;--mu:#536277;--secondary:#3e4e64;--amb:#a65d00;--tea:#0f8079;--vio:#7953c6;--red:#c93240;--grn:#168348;--blu:#2563eb}
@@ -252,6 +255,8 @@ code,.mono{background:#eaf0f7}:root[data-theme="dark"] code,:root[data-theme="da
 .q1g-svg .q1g-observation{stroke:var(--card);stroke-width:1;cursor:help}.q1g-svg .q1g-current-point{stroke:var(--tx);stroke-width:2}.q1g-svg .q1g-observation:hover,.q1g-svg .q1g-observation:focus{stroke:var(--tx);stroke-width:2.5;outline:none}
 .tw{overflow-x:auto}.cmp table{font-size:12px}.cmp th,.cmp td{padding:7px 9px;white-space:nowrap}
 .theme-toolbar{display:none!important}body{overflow-y:hidden}
+
+.wrap{margin:0!important;padding-left:8px!important}
 </script>
 <script type="text/plain" id="evosrc">(()=>{
  const root=document.getElementById('fourEvolution');
@@ -2110,7 +2115,7 @@ async function atualizar(origem, arquivoLocal) {
 }
 
 /* ---- dialogo ---- */
-function abrir() { $('fdbx').value = LS.get('janela.dropbox') || ''; $('fclm').value = LS.get('janela.clima') || CLIMA_ID; if (!$('dlg').open) $('dlg').showModal(); }
+function abrir() { $('fate').textContent = dm(A.dados().meta.ultima_venda); $('fdbx').value = LS.get('janela.dropbox') || ''; $('fclm').value = LS.get('janela.clima') || CLIMA_ID; if (!$('dlg').open) $('dlg').showModal(); }
 $('syncb').onclick = abrir;
 $('fclose').onclick = () => $('dlg').close();
 $('fsave').onclick = () => { LS.set('janela.dropbox', $('fdbx').value.trim()); LS.set('janela.clima', $('fclm').value.trim()); msg(''); atualizar('manual'); };
@@ -2123,7 +2128,7 @@ $('ffile').onchange = e => { const f = e.target.files[0]; if (f) { LS.set('janel
     const a = cache.DADOS.meta, b = A.dados().meta;
     if ((a.ultima_venda + '|' + (a.clima_ate || '')) >= (b.ultima_venda + '|' + (b.clima_ate || ''))) A.aplicar(cache.DADOS, cache.PROD);
   }
-  if (!LS.get('janela.dropbox')) { status('Configurar fonte de dados', 'err'); abrir(); msg('Cole uma vez o link do arquivo no Dropbox. Enquanto isso o painel mostra os dados embutidos (até ' + dm(A.dados().meta.ultima_venda) + ').'); return; }
+  if (!LS.get('janela.dropbox')) { status('Configurar fonte de dados', 'err'); abrir();  return; }
   atualizar('abertura');
 })();
 })();
